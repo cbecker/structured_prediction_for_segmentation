@@ -15,11 +15,10 @@
 #include <limits.h>
 #include <vector>
 #include <string>
-#include <stack>
 using namespace std;
 
 #ifndef WINDOWS
-#include "supervoxel_globals.h"
+typedef unsigned int UINT;
 #endif
 
 const int dx4[4] = {-1,  0,  1,  0};
@@ -41,16 +40,11 @@ typedef int sidType;
 #define UNDEFINED_LABEL -1
 #define MAX_SID INT_MAX
 
-struct sPixel
-{
-  int x;
-  int y;
-  int z;
-};
-
 class LKM  
 {
 public:
+	typedef double FloatType;
+
 	LKM(bool _freeMem = true);
 	virtual ~LKM();
 
@@ -74,14 +68,16 @@ public:
                 const double cubeness = 20);
 
         void DoSupervoxelSegmentationForGrayVolume(
-                                                   double**		       			ubuffvec,
-                                                   const int					width,
-                                                   const int					height,
-                                                   const int					depth,
+                                                   const unsigned char *       			ubuffvec,
+                                                   const int&					width,
+                                                   const int&					height,
+                                                   const int&					depth,
                                                    sidType**&					klabels,
                                                    int&						numlabels,
-                                                   const int					STEP,
-                                                   const double cubeness = 20);
+                                                   const int&					STEP,
+                                                   const FloatType cubeness = 20,
+                                                   int zStep = -1   // if zStep <= 0, then zStep = STEP
+                                                  );
 
 	void SaveLabels(
                         sidType*&					labels,
@@ -109,75 +105,79 @@ public:
 private:
 
 	void PerformLKMClustering(
-		vector<double>&				kseedsl,
-		vector<double>&				kseedsa,
-		vector<double>&				kseedsb,
-		vector<double>&				kseedsx,
-		vector<double>&				kseedsy,
+		vector<FloatType>&				kseedsl,
+		vector<FloatType>&				kseedsa,
+		vector<FloatType>&				kseedsb,
+		vector<FloatType>&				kseedsx,
+		vector<FloatType>&				kseedsy,
 		sidType*&						klabels,
 		const int&					STEP,
                 const float M);
 
 	void PerformLKMVoxelClustering(
-		vector<double>&				kseedsl,
-		vector<double>&				kseedsa,
-		vector<double>&				kseedsb,
-		vector<double>&				kseedsx,
-		vector<double>&				kseedsy,
-		vector<double>&				kseedsz,
+		vector<FloatType>&				kseedsl,
+		vector<FloatType>&				kseedsa,
+		vector<FloatType>&				kseedsb,
+		vector<FloatType>&				kseedsx,
+		vector<FloatType>&				kseedsy,
+		vector<FloatType>&				kseedsz,
 		sidType**&						klabels,
 		const int&					STEP,
-                const double cubeness);
+                const FloatType cubeness);
 
         // Al : Added clustering for gray images
 	void PerformLKMVoxelClustering(
-		vector<double>&				kseedsl,
-		vector<double>&				kseedsx,
-		vector<double>&				kseedsy,
-		vector<double>&				kseedsz,
+		vector<FloatType>&				kseedsl,
+		vector<FloatType>&				kseedsx,
+		vector<FloatType>&				kseedsy,
+		vector<FloatType>&				kseedsz,
 		sidType**&     		       		klabels,
 		const int&		       		STEP,
-                const double cubeness);
+                const FloatType cubeness,
+                int zStep = -1
+                                  );
 
 	void GetKValues_LABXY(
-		vector<double>&				kseedsl,
-		vector<double>&				kseedsa,
-		vector<double>&				kseedsb,
-		vector<double>&				kseedsx,
-		vector<double>&				kseedsy,
+		vector<FloatType>&				kseedsl,
+		vector<FloatType>&				kseedsa,
+		vector<FloatType>&				kseedsb,
+		vector<FloatType>&				kseedsx,
+		vector<FloatType>&				kseedsy,
 		const int&		       		STEP,
 		const bool&		       		perturbseeds);
 
 	void GetKValues_LABXYZ(
-		vector<double>&				kseedsl,
-		vector<double>&				kseedsa,
-		vector<double>&				kseedsb,
-		vector<double>&				kseedsx,
-		vector<double>&				kseedsy,
-		vector<double>&				kseedsz,
+		vector<FloatType>&				kseedsl,
+		vector<FloatType>&				kseedsa,
+		vector<FloatType>&				kseedsb,
+		vector<FloatType>&				kseedsx,
+		vector<FloatType>&				kseedsy,
+		vector<FloatType>&				kseedsz,
 		const int&				STEP);
 
 	void GetKValues_LABXYZ(
-		vector<double>&				kseedsl,
-		vector<double>&				kseedsx,
-		vector<double>&				kseedsy,
-		vector<double>&				kseedsz,
-		const int&					STEP);
+		vector<FloatType>&				kseedsl,
+		vector<FloatType>&				kseedsx,
+		vector<FloatType>&				kseedsy,
+		vector<FloatType>&				kseedsz,
+		const int&					STEP,
+        int zStep = -1   // if zStep <= 0, then zStep = STEP
+                          );
 
 	void PerturbSeeds(
-		vector<double>&				kseedsl,
-		vector<double>&				kseedsa,
-		vector<double>&				kseedsb,
-		vector<double>&				kseedsx,
-		vector<double>&				kseedsy);
+		vector<FloatType>&				kseedsl,
+		vector<FloatType>&				kseedsa,
+		vector<FloatType>&				kseedsb,
+		vector<FloatType>&				kseedsx,
+		vector<FloatType>&				kseedsy);
 
 	void DetectLabEdges(
-		double*&				lvec,
-		double*&				avec,
-		double*&				bvec,
+		FloatType*&				lvec,
+		FloatType*&				avec,
+		FloatType*&				bvec,
 		int&					width,
 		int&					height,
-		vector<double>&				edges);
+		vector<FloatType>&				edges);
 
 	void EnforceConnectivityForLargeImages(
 		const int					width,
@@ -192,19 +192,19 @@ private:
 		sidType**&						labels,//input labels that need to be corrected to remove stray single labels
 		int&						numlabels);
 
-	void RGB2LAB(const int& r, const int& g, const int& b, double& lval, double& aval, double& bval);
+	void RGB2LAB(const int& r, const int& g, const int& b, FloatType& lval, FloatType& aval, FloatType& bval);
 
 	void DoRGBtoLABConversion(
 		UINT*&				ubuff,
-		double*&					lvec,
-		double*&					avec,
-		double*&					bvec);
+		FloatType*&					lvec,
+		FloatType*&					avec,
+		FloatType*&					bvec);
 
 	void DoRGBtoLABConversion(
 		UINT**&						ubuff,
-		double**&					lvec,
-		double**&					avec,
-		double**&					bvec);
+		FloatType**&					lvec,
+		FloatType**&					avec,
+		FloatType**&					bvec);
 
 	//===========================================================================
 	///	FindNextRecursively
@@ -330,7 +330,9 @@ private:
                                      const int&					depth,
                                      sidType**&					labels,
                                      int&					numlabels,
-                                     const int&					STEP);
+                                     const int&					STEP,
+                                     int zStep = -1
+                                    );
 
 	void FindNext(
 		sidType**&     					labels,
@@ -359,47 +361,6 @@ private:
 			}
 		}
 	}
-
-	void FindNext(
-		sidType**&     					labels,
-		sidType**&	       				nlabels,
-		const int&					depth,
-		const int&					height,
-		const int&					width,
-                std::stack<sPixel>& listPixels,
-		const sidType&					lab)
-	{
-          sPixel pix;
-          int d,h,w;
-          while(!listPixels.empty())
-            {
-              pix = listPixels.top();
-              listPixels.pop();
-              d = pix.z;
-              h = pix.y;
-              w = pix.x;
-              sidType oldlab = labels[d][h*width+w];
-              for( int i = 0; i < 6; i++ )
-		{
-                  int z = d+dz6[i];int y = h+dy6[i];int x = w+dx6[i];
-                  if( (z < depth && z >= 0) && (y < height && y >= 0) && (x < width && x >= 0) )
-                    {
-                      int ind = y*width+x;
-                      //if(nlabels[z][ind] < 0 && labels[z][ind] == oldlab )
-                      if(nlabels[z][ind] == UNDEFINED_LABEL && labels[z][ind] == oldlab )
-                        {
-                          nlabels[z][ind] = lab;
-                          sPixel newPix;
-                          newPix.x = x;
-                          newPix.y = y;
-                          newPix.z = z;
-                          listPixels.push(newPix);
-                        }
-                    }
-		}
-            }
-	}
-
 
 	//===========================================================================
 	///	CountAndRelabel
@@ -520,74 +481,18 @@ private:
 		}
 	}
 
-        //===========================================================================
-	///	FindNext
-	///     Modified by Al
-	///	Helper function for RelabelStraySupervoxels. Overloaded version.
-	//===========================================================================
-	void FindNext(
-		sidType**&     					labels,
-		sidType**&	       				nlabels,
-		const int&					depth,
-		const int&					height,
-		const int&					width,
-                std::stack<sPixel>& listPixels,
-		const sidType&					lab,
-		int*&						xvec,
-		int*&						yvec,
-		int*&						zvec,
-		int&						count)
-	{
-          sPixel pix;
-          int d,h,w;
-          while(!listPixels.empty())
-            {
-              pix = listPixels.top();
-              listPixels.pop();
-              d = pix.z;
-              h = pix.y;
-              w = pix.x;
-              sidType oldlab = labels[d][h*width+w];
-              for( int i = 0; i < 10; i++ )
-		{
-                  int z = d+dz10[i];
-                  int y = h+dy10[i];
-                  int x = w+dx10[i];
-                  if( (z < depth && z >= 0) && (y < height && y >= 0) && (x < width && x >= 0) )
-                    {
-                      int ind = y*width+x;
-                      //if(nlabels[z][ind] < 0 && labels[z][ind] == oldlab )
-                      if(nlabels[z][ind] == UNDEFINED_LABEL && labels[z][ind] == oldlab )
-                        {
-                          xvec[count] = x;
-                          yvec[count] = y;
-                          zvec[count] = z;
-                          count++;
-
-                          nlabels[z][ind] = lab;
-                          sPixel newPix;
-                          newPix.x = x;
-                          newPix.y = y;
-                          newPix.z = z;
-                          listPixels.push(newPix);
-                        }
-                    }
-		}
-            }
-	}
-
 private:
 	int										m_width;
 	int										m_height;
 	int										m_depth;
 
-	double*									m_lvec;
-	double*									m_avec;
-	double*									m_bvec;
+	FloatType*									m_lvec;
+	FloatType*									m_avec;
+	FloatType*									m_bvec;
 
-	double**								m_lvecvec;
-	double**								m_avecvec;
-	double**								m_bvecvec;
+        const unsigned char*                                                    m_lvecvec;
+	FloatType**								m_avecvec;
+	FloatType**								m_bvecvec;
 
         bool freeMem;
 };

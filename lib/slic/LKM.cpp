@@ -14,6 +14,10 @@
 #include <fstream>
 #include "LKM.h"
 
+#ifdef _OPENMP
+#include "omp.h"
+#endif
+
 #ifndef WINDOWS
 #include <assert.h>
 #include "utils.h"
@@ -55,12 +59,14 @@ LKM::~LKM()
 	if(m_avec) delete [] m_avec;
 	if(m_bvec) delete [] m_bvec;
 
-
+#if 0 //m_lvecvec is assigned to ubuffvec so don't delete it!
 	if(m_lvecvec)
 	{
-		for( int d = 0; d < m_depth; d++ ) delete [] m_lvecvec[d];
-		delete [] m_lvecvec;
-	}
+                //for( int d = 0; d < m_depth; d++ ) delete [] m_lvecvec[d];
+                delete[] m_lvecvec;
+        }
+#endif
+
 	if(m_avecvec)
 	{
 		for( int d = 0; d < m_depth; d++ ) delete [] m_avecvec[d];
@@ -79,18 +85,18 @@ LKM::~LKM()
 ///
 ///	http://www.filtermeister.com/codelibrary/code/rgb_lab_rgb.txt
 //===========================================================================
-void LKM::RGB2LAB(const int& r, const int& g, const int& b, double& lval, double& aval, double& bval)
+void LKM::RGB2LAB(const int& r, const int& g, const int& b, FloatType& lval, FloatType& aval, FloatType& bval)
 {
-	double xVal = 0.412453 * r + 0.357580 * g + 0.180423 * b;
-	double yVal = 0.212671 * r + 0.715160 * g + 0.072169 * b;
-	double zVal = 0.019334 * r + 0.119193 * g + 0.950227 * b;
+	FloatType xVal = 0.412453 * r + 0.357580 * g + 0.180423 * b;
+	FloatType yVal = 0.212671 * r + 0.715160 * g + 0.072169 * b;
+	FloatType zVal = 0.019334 * r + 0.119193 * g + 0.950227 * b;
 
 	xVal /= (255.0 * 0.950456);
 	yVal /=  255.0;
 	zVal /= (255.0 * 1.088754);
 
-	double fY, fZ, fX;
-	double lVal, aVal, bVal;
+	FloatType fY, fZ, fX;
+	FloatType lVal, aVal, bVal;
 
 	if (yVal > 0.008856f)
 	{
@@ -128,14 +134,14 @@ void LKM::RGB2LAB(const int& r, const int& g, const int& b, double& lval, double
 //===========================================================================
 void LKM::DoRGBtoLABConversion(
 	UINT*&				ubuff,
-	double*&					lvec,
-	double*&					avec,
-	double*&					bvec)
+	FloatType*&					lvec,
+	FloatType*&					avec,
+	FloatType*&					bvec)
 {
 	int sz = m_width*m_height;
-	lvec = new double[sz];
-	avec = new double[sz];
-	bvec = new double[sz];
+	lvec = new FloatType[sz];
+	avec = new FloatType[sz];
+	bvec = new FloatType[sz];
 
 	for( int j = 0; j < sz; j++ )
 	{
@@ -154,9 +160,9 @@ void LKM::DoRGBtoLABConversion(
 //===========================================================================
 void LKM::DoRGBtoLABConversion(
 	UINT**&				ubuff,
-	double**&					lvec,
-	double**&					avec,
-	double**&					bvec)
+	FloatType**&					lvec,
+	FloatType**&					avec,
+	FloatType**&					bvec)
 {
 	int sz = m_width*m_height;
 	for( int d = 0; d < m_depth; d++ )
@@ -176,12 +182,12 @@ void LKM::DoRGBtoLABConversion(
 ///	DetectLabEdges
 //==============================================================================
 void LKM::DetectLabEdges(
-	double*&				lvec,
-	double*&				avec,
-	double*&				bvec,
+	FloatType*&				lvec,
+	FloatType*&				avec,
+	FloatType*&				bvec,
 	int&					width,
 	int&					height,
-	vector<double>&				edges)
+	vector<FloatType>&				edges)
 {
 	int sz = width*height;
 
@@ -192,11 +198,11 @@ void LKM::DetectLabEdges(
 		{
 			int i = j*width+k;
 
-			double dx = (lvec[i-1]-lvec[i+1])*(lvec[i-1]-lvec[i+1]) +
+			FloatType dx = (lvec[i-1]-lvec[i+1])*(lvec[i-1]-lvec[i+1]) +
 						(avec[i-1]-avec[i+1])*(avec[i-1]-avec[i+1]) +
 						(bvec[i-1]-bvec[i+1])*(bvec[i-1]-bvec[i+1]);
 
-			double dy = (lvec[i-width]-lvec[i+width])*(lvec[i-width]-lvec[i+width]) +
+			FloatType dy = (lvec[i-width]-lvec[i+width])*(lvec[i-width]-lvec[i+width]) +
 						(avec[i-width]-avec[i+width])*(avec[i-width]-avec[i+width]) +
 						(bvec[i-width]-bvec[i+width])*(bvec[i-width]-bvec[i+width]);
 
@@ -209,13 +215,13 @@ void LKM::DetectLabEdges(
 ///	PerturbSeeds
 //===========================================================================
 void LKM::PerturbSeeds(
-	vector<double>&				kseedsl,
-	vector<double>&				kseedsa,
-	vector<double>&				kseedsb,
-	vector<double>&				kseedsx,
-	vector<double>&				kseedsy)
+	vector<FloatType>&				kseedsl,
+	vector<FloatType>&				kseedsa,
+	vector<FloatType>&				kseedsb,
+	vector<FloatType>&				kseedsx,
+	vector<FloatType>&				kseedsy)
 {
-	vector<double> edges(0);
+	vector<FloatType> edges(0);
 	DetectLabEdges(m_lvec, m_avec, m_bvec, m_width, m_height, edges);
 
 	const int dx8[8] = {-1, -1,  0,  1, 1, 1, 0, -1};
@@ -262,11 +268,11 @@ void LKM::PerturbSeeds(
 /// The k seed values are taken as uniform spatial pixel samples.
 //===========================================================================
 void LKM::GetKValues_LABXY(
-	vector<double>&				kseedsl,
-	vector<double>&				kseedsa,
-	vector<double>&				kseedsb,
-	vector<double>&				kseedsx,
-	vector<double>&				kseedsy,
+	vector<FloatType>&				kseedsl,
+	vector<FloatType>&				kseedsa,
+	vector<FloatType>&				kseedsb,
+	vector<FloatType>&				kseedsx,
+	vector<FloatType>&				kseedsy,
 	const int&					STEP,
 	const bool&					perturbseeds)
 {
@@ -275,14 +281,14 @@ void LKM::GetKValues_LABXY(
 
 	//int xstrips = m_width/STEP;
 	//int ystrips = m_height/STEP;
-	int xstrips = (0.5+double(m_width)/double(STEP));
-	int ystrips = (0.5+double(m_height)/double(STEP));
+	int xstrips = (0.5+FloatType(m_width)/FloatType(STEP));
+	int ystrips = (0.5+FloatType(m_height)/FloatType(STEP));
 
 	int xerr = m_width  - STEP*xstrips;
 	int yerr = m_height - STEP*ystrips;
 
-	double xerrperstrip = double(xerr)/double(xstrips);
-	double yerrperstrip = double(yerr)/double(ystrips);
+	FloatType xerrperstrip = FloatType(xerr)/FloatType(xstrips);
+	FloatType yerrperstrip = FloatType(yerr)/FloatType(ystrips);
 
 	int xoff = STEP/2;
 	int yoff = STEP/2;
@@ -320,34 +326,35 @@ void LKM::GetKValues_LABXY(
 	}
 }
 
+#if 0
 //===========================================================================
 ///	GetKValues_LABXYZ
 ///
 /// The k seed values are taken as uniform spatial pixel samples.
 //===========================================================================
 void LKM::GetKValues_LABXYZ(
-	vector<double>&				kseedsl,
-	vector<double>&				kseedsa,
-	vector<double>&				kseedsb,
-	vector<double>&				kseedsx,
-	vector<double>&				kseedsy,
-	vector<double>&				kseedsz,
+	vector<FloatType>&				kseedsl,
+	vector<FloatType>&				kseedsa,
+	vector<FloatType>&				kseedsb,
+	vector<FloatType>&				kseedsx,
+	vector<FloatType>&				kseedsy,
+	vector<FloatType>&				kseedsz,
 	const int&					STEP)
 {
 	int numseeds(0);
 	int n(0);
 
-	int xstrips = (0.5+double(m_width)/double(STEP));
-	int ystrips = (0.5+double(m_height)/double(STEP));
-	int zstrips = (0.5+double(m_depth)/double(STEP));
+	int xstrips = (0.5+FloatType(m_width)/FloatType(STEP));
+	int ystrips = (0.5+FloatType(m_height)/FloatType(STEP));
+	int zstrips = (0.5+FloatType(m_depth)/FloatType(STEP));
 
 	int xerr = m_width  - STEP*xstrips;
 	int yerr = m_height - STEP*ystrips;
 	int zerr = m_depth  - STEP*zstrips;
 
-	double xerrperstrip = double(xerr)/double(xstrips);
-	double yerrperstrip = double(yerr)/double(ystrips);
-	double zerrperstrip = double(zerr)/double(zstrips);
+	FloatType xerrperstrip = FloatType(xerr)/FloatType(xstrips);
+	FloatType yerrperstrip = FloatType(yerr)/FloatType(ystrips);
+	FloatType zerrperstrip = FloatType(zerr)/FloatType(zstrips);
 
 	int xoff = STEP/2;
 	int yoff = STEP/2;
@@ -387,37 +394,43 @@ void LKM::GetKValues_LABXYZ(
 		}
 	}
 }
-
+#endif
 //===========================================================================
 ///	GetKValues_LABXYZ
 ///
 /// The k seed values are taken as uniform spatial pixel samples.
 //===========================================================================
 void LKM::GetKValues_LABXYZ(
-	vector<double>&				kseedsl,
-	vector<double>&				kseedsx,
-	vector<double>&				kseedsy,
-	vector<double>&				kseedsz,
-	const int&					STEP)
+	vector<FloatType>&				kseedsl,
+	vector<FloatType>&				kseedsx,
+	vector<FloatType>&				kseedsy,
+	vector<FloatType>&				kseedsz,
+	const int&					STEP,
+    int                   zStep  // optional, if <= 0, then zStep = STEP
+                           )
 {
+    if (zStep <= 0)
+        zStep = STEP;
+    
 	int numseeds(0);
 	int n(0);
+        int sz = m_width*m_height;
 
-	int xstrips = (0.5+double(m_width)/double(STEP));
-	int ystrips = (0.5+double(m_height)/double(STEP));
-	int zstrips = (0.5+double(m_depth)/double(STEP));
+	int xstrips = (0.5+FloatType(m_width)/FloatType(STEP));
+	int ystrips = (0.5+FloatType(m_height)/FloatType(STEP));
+	int zstrips = (0.5+FloatType(m_depth)/FloatType(zStep));
 
 	int xerr = m_width  - STEP*xstrips;
 	int yerr = m_height - STEP*ystrips;
-	int zerr = m_depth  - STEP*zstrips;
+	int zerr = m_depth  - zStep*zstrips;
 
-	double xerrperstrip = double(xerr)/double(xstrips);
-	double yerrperstrip = double(yerr)/double(ystrips);
-	double zerrperstrip = double(zerr)/double(zstrips);
+	FloatType xerrperstrip = FloatType(xerr)/FloatType(xstrips);
+	FloatType yerrperstrip = FloatType(yerr)/FloatType(ystrips);
+	FloatType zerrperstrip = FloatType(zerr)/FloatType(zstrips);
 
 	int xoff = STEP/2;
 	int yoff = STEP/2;
-	int zoff = STEP/2;
+	int zoff = zStep/2;
 	//-------------------------
 	numseeds = xstrips*ystrips*zstrips;
 	//-------------------------
@@ -429,18 +442,20 @@ void LKM::GetKValues_LABXYZ(
 	for( int z = 0; z < zstrips; z++ )
 	{
 		int ze = z*zerrperstrip;
-		int d = (z*STEP+zoff+ze);
+		int d = (z*zStep+zoff+ze);
+                int zOff = z*sz;
+
 		for( int y = 0; y < ystrips; y++ )
 		{
 			int ye = y*yerrperstrip;
 			for( int x = 0; x < xstrips; x++ )
 			{
 				int xe = x*xerrperstrip;
-				int i = (y*STEP+yoff+ye)*m_width + (x*STEP+xoff+xe);
+                                int i = (y*STEP+yoff+ye)*m_width + (x*STEP+xoff+xe) + zOff;
 
 				//_ASSERT(n < numseeds);
 				
-				kseedsl[n] = m_lvecvec[d][i];
+                                kseedsl[n] = m_lvecvec[i];
 				kseedsx[n] = (x*STEP+xoff+xe);
 				kseedsy[n] = (y*STEP+yoff+ye);
 				kseedsz[n] = d;
@@ -457,11 +472,11 @@ void LKM::GetKValues_LABXYZ(
 /// over the entire image.
 //===========================================================================
 void LKM::PerformLKMClustering(
-	vector<double>&		kseedsl,
-	vector<double>&		kseedsa,
-	vector<double>&		kseedsb,
-	vector<double>&		kseedsx,
-	vector<double>&		kseedsy,
+	vector<FloatType>&		kseedsl,
+	vector<FloatType>&		kseedsa,
+	vector<FloatType>&		kseedsb,
+	vector<FloatType>&		kseedsx,
+	vector<FloatType>&		kseedsy,
 	sidType*&	   	klabels,
 	const int&	       	STEP,
         const float M)
@@ -475,23 +490,23 @@ void LKM::PerformLKMClustering(
 	//----------------
 
 	
-	vector<double> clustersize(numk, 0);
-	vector<double> inv(numk, 0);//to store 1/clustersize[k] values
+	vector<FloatType> clustersize(numk, 0);
+	vector<FloatType> inv(numk, 0);//to store 1/clustersize[k] values
 
-	vector<double> sigmal(numk, 0);
-	vector<double> sigmaa(numk, 0);
-	vector<double> sigmab(numk, 0);
-	vector<double> sigmax(numk, 0);
-	vector<double> sigmay(numk, 0);
-	vector<double> distvec(sz, DBL_MAX);
+	vector<FloatType> sigmal(numk, 0);
+	vector<FloatType> sigmaa(numk, 0);
+	vector<FloatType> sigmab(numk, 0);
+	vector<FloatType> sigmax(numk, 0);
+	vector<FloatType> sigmay(numk, 0);
+	vector<FloatType> distvec(sz, DBL_MAX);
 
-	//double invwt = 1.0/((STEP/10.0)*(STEP/10.0));
-        double invwt = 1.0/((STEP/M)*(STEP/M));
+	//FloatType invwt = 1.0/((STEP/10.0)*(STEP/10.0));
+        FloatType invwt = 1.0/((STEP/M)*(STEP/M));
 
 	int x1, y1, x2, y2;
-	double l, a, b;
-	double dist;
-	double distxy;
+	FloatType l, a, b;
+	FloatType dist;
+	FloatType distxy;
 	for( int itr = 0; itr < 10; itr++ )
 	{
 		distvec.assign(sz, DBL_MAX);
@@ -503,10 +518,10 @@ void LKM::PerformLKMClustering(
 			x1 = max(0,			kseedsx[n]-offset);
 			x2 = min(m_width,	kseedsx[n]+offset);
                   */
-                  y1 = max(0.0,			kseedsy[n]-offset);
-                  y2 = min((double)m_height,	kseedsy[n]+offset);
-                  x1 = max(0.0,			kseedsx[n]-offset);
-                  x2 = min((double)m_width,	kseedsx[n]+offset);
+                  y1 = max((FloatType)0.0,			kseedsy[n]-offset);
+                  y2 = min((FloatType)m_height,	kseedsy[n]+offset);
+                  x1 = max((FloatType)0.0,			kseedsx[n]-offset);
+                  x2 = min((FloatType)m_width,	kseedsx[n]+offset);
 
 
 			for( int y = y1; y < y2; y++ )
@@ -593,6 +608,7 @@ void LKM::PerformLKMClustering(
 	}
 }
 
+#if 0
 //===========================================================================
 ///	PerformLKMVoxelClustering
 ///
@@ -600,18 +616,18 @@ void LKM::PerformLKMClustering(
 /// over the entire image.
 //===========================================================================
 void LKM::PerformLKMVoxelClustering(
-	vector<double>&				kseedsl,
-	vector<double>&				kseedsa,
-	vector<double>&				kseedsb,
-	vector<double>&				kseedsx,
-	vector<double>&				kseedsy,
-	vector<double>&				kseedsz,
+	vector<FloatType>&				kseedsl,
+	vector<FloatType>&				kseedsa,
+	vector<FloatType>&				kseedsb,
+	vector<FloatType>&				kseedsx,
+	vector<FloatType>&				kseedsy,
+	vector<FloatType>&				kseedsz,
 	sidType**&    	       			klabels,
 	const int&	       			STEP,
-        const double cubeness)
+        const FloatType cubeness)
 {
-	unsigned long sz = m_width*m_height;
-	const unsigned int numk = kseedsl.size();
+	int sz = m_width*m_height;
+	const int numk = kseedsl.size();
 	int numitr(0);
 
         if(numk >= MAX_SID)
@@ -624,27 +640,27 @@ void LKM::PerformLKMVoxelClustering(
 	int offset = STEP;
 	//----------------
 
-	vector<double> clustersize(numk, 0);
-	vector<double> inv(numk, 0);//to store 1/clustersize[k] values
+	vector<FloatType> clustersize(numk, 0);
+	vector<FloatType> inv(numk, 0);//to store 1/clustersize[k] values
 
-	vector<double> sigmal(numk, 0);
-	vector<double> sigmaa(numk, 0);
-	vector<double> sigmab(numk, 0);
-	vector<double> sigmax(numk, 0);
-	vector<double> sigmay(numk, 0);
-	vector<double> sigmaz(numk, 0);
+	vector<FloatType> sigmal(numk, 0);
+	vector<FloatType> sigmaa(numk, 0);
+	vector<FloatType> sigmab(numk, 0);
+	vector<FloatType> sigmax(numk, 0);
+	vector<FloatType> sigmay(numk, 0);
+	vector<FloatType> sigmaz(numk, 0);
 
-	vector< double > initdouble(sz, DBL_MAX);
-	vector< vector<double> > distvec(m_depth, initdouble);
+	vector< FloatType > initdouble(sz, DBL_MAX);
+	vector< vector<FloatType> > distvec(m_depth, initdouble);
 	//vector<double> distvec(sz, DBL_MAX);
 
 	//double invwt = 1.0/((STEP/20.0)*(STEP/20.0));
-        double invwt = 1.0/((STEP/cubeness)*(STEP/cubeness));
+        FloatType invwt = 1.0/((STEP/cubeness)*(STEP/cubeness));
 
 	int x1, y1, x2, y2, z1, z2;
-	double l, a, b;
-	double dist;
-	double distxyz;
+	FloatType l, a, b;
+	FloatType dist;
+	FloatType distxyz;
 	for( int itr = 0; itr < 5; itr++ )
 	{
 		distvec.assign(m_depth, initdouble);
@@ -659,11 +675,11 @@ void LKM::PerformLKMVoxelClustering(
 			z2 = min(m_depth,	kseedsz[n]+offset);
                   */
 			y1 = max(0.0,			kseedsy[n]-offset);
-			y2 = min((double)m_height,	kseedsy[n]+offset);
+			y2 = min((FloatType)m_height,	kseedsy[n]+offset);
 			x1 = max(0.0,			kseedsx[n]-offset);
-			x2 = min((double)m_width,	kseedsx[n]+offset);
+			x2 = min((FloatType)m_width,	kseedsx[n]+offset);
 			z1 = max(0.0,			kseedsz[n]-offset);
-			z2 = min((double)m_depth,	kseedsz[n]+offset);
+			z2 = min((FloatType)m_depth,	kseedsz[n]+offset);
 
 			for( int z = z1; z < z2; z++ )
 			{
@@ -758,6 +774,7 @@ void LKM::PerformLKMVoxelClustering(
 		}}
 	}
 }
+#endif
 
 //===========================================================================
 ///	PerformLKMVoxelClustering
@@ -766,15 +783,21 @@ void LKM::PerformLKMVoxelClustering(
 /// over the entire image.
 //===========================================================================
 void LKM::PerformLKMVoxelClustering(
-	vector<double>&				kseedsl,
-	vector<double>&				kseedsx,
-	vector<double>&				kseedsy,
-	vector<double>&				kseedsz,
+	vector<FloatType>&				kseedsl,
+	vector<FloatType>&				kseedsx,
+	vector<FloatType>&				kseedsy,
+	vector<FloatType>&				kseedsz,
 	sidType**&				klabels,
 	const int&			      	STEP,
-        const double cubeness)
+        const FloatType cubeness,
+        int zStep
+                                   )
 {
+    if (zStep <= 0)
+        zStep = STEP;
+    
 	int sz = m_width*m_height;
+
 	const int numk = kseedsl.size();
 	int numitr(0);
 
@@ -786,30 +809,28 @@ void LKM::PerformLKMVoxelClustering(
 
 	//----------------
 	int offset = STEP;
+    int zOffset = zStep;
 	//----------------
 
-	vector<double> clustersize(numk, 0);
-	vector<double> inv(numk, 0);//to store 1/clustersize[k] values
+	vector<FloatType> clustersize(numk, 0);
+	//vector<FloatType> inv(numk, 0);//to store 1/clustersize[k] values
 
-	vector<double> sigmal(numk, 0);
-	vector<double> sigmax(numk, 0);
-	vector<double> sigmay(numk, 0);
-	vector<double> sigmaz(numk, 0);
+	vector<FloatType> sigmal(numk, 0);
+	vector<FloatType> sigmax(numk, 0);
+	vector<FloatType> sigmay(numk, 0);
+	vector<FloatType> sigmaz(numk, 0);
 
-	vector< double > initdouble(sz, DBL_MAX);
-	vector< vector<double> > distvec(m_depth, initdouble);
+	vector< FloatType > initdouble(sz, DBL_MAX);
+	vector< vector<FloatType> > distvec(m_depth, initdouble);
 	//vector<double> distvec(sz, DBL_MAX);
 
 	//double invwt = 1.0/((STEP/20.0)*(STEP/20.0));
-        double invwt = 1.0/((STEP/cubeness)*(STEP/cubeness));
-
-	int x1, y1, x2, y2, z1, z2;
-	double l;
-	double dist;
-	double distxyz;
+	FloatType invwt = 1.0/((STEP/cubeness)*(STEP/cubeness));
+	
 	for( int itr = 0; itr < 5; itr++ )
 	{
 		distvec.assign(m_depth, initdouble);
+		
 		for( int n = 0; n < numk; n++ )
 		{
                   /*
@@ -820,27 +841,30 @@ void LKM::PerformLKMVoxelClustering(
 			z1 = max(0,			kseedsz[n]-offset);
 			z2 = min(m_depth,	kseedsz[n]+offset);
                   */
-			y1 = max(0.0,			kseedsy[n]-offset);
-			y2 = min((double)m_height,	kseedsy[n]+offset);
-			x1 = max(0.0,			kseedsx[n]-offset);
-			x2 = min((double)m_width,	kseedsx[n]+offset);
-			z1 = max(0.0,			kseedsz[n]-offset);
-			z2 = min((double)m_depth,	kseedsz[n]+offset);
-
+			int y1 = max((FloatType)0.0,			kseedsy[n]-offset);
+			int y2 = min((FloatType)m_height,	kseedsy[n]+offset);
+			int x1 = max((FloatType)0.0,			kseedsx[n]-offset);
+			int x2 = min((FloatType)m_width,	kseedsx[n]+offset);
+			int z1 = max((FloatType)0.0,			kseedsz[n]-zOffset);
+			int z2 = min((FloatType)m_depth,	kseedsz[n]+zOffset);
+			
+			//#pragma omp parallel for schedule(dynamic)
 			for( int z = z1; z < z2; z++ )
 			{
+				int zOff = z*sz;
 				for( int y = y1; y < y2; y++ )
 				{
 					for( int x = x1; x < x2; x++ )
 					{
-						int i = y*m_width + x;
+						int ixy = y*m_width + x;
+						int i = ixy + zOff;
 						//_ASSERT( y < m_height && x < m_width && y >= 0 && x >= 0 );
 
-						l = m_lvecvec[z][i];
+						FloatType l = m_lvecvec[i];
 
-						dist = (l - kseedsl[n])*(l - kseedsl[n]);
+						FloatType dist = (l - kseedsl[n])*(l - kseedsl[n]);
 
-						distxyz = (x - kseedsx[n])*(x - kseedsx[n]) +
+						FloatType distxyz = (x - kseedsx[n])*(x - kseedsx[n]) +
                                                   (y - kseedsy[n])*(y - kseedsy[n]) +
                                                   (z - kseedsz[n])*(z - kseedsz[n]);
 						//------------------------------------------------------------------------
@@ -857,10 +881,11 @@ void LKM::PerformLKMVoxelClustering(
 													//but usually decent ones. Too many noisy segments
 													//RemoveSmallSegments is not used. Probably discard...
 						//------------------------------------------------------------------------
-						if( dist < distvec[z][i] )
+
+						if( dist < distvec[z][ixy] )
 						{
-							distvec[z][i] = dist;
-							klabels[z][i]  = n;
+							distvec[z][ixy] = dist;
+							klabels[z][ixy]  = n;
 						}
 					}
 				}
@@ -880,11 +905,12 @@ void LKM::PerformLKMVoxelClustering(
 		for( int d = 0; d < m_depth; d++  )
 		{
 			int ind(0);
+                        int zOff = d*sz;
 			for( int r = 0; r < m_height; r++ )
 			{
 				for( int c = 0; c < m_width; c++ )
 				{
-					sigmal[klabels[d][ind]] += m_lvecvec[d][ind];
+                                        sigmal[klabels[d][ind]] += m_lvecvec[ind + zOff];
 					sigmax[klabels[d][ind]] += c;
 					sigmay[klabels[d][ind]] += r;
 					sigmaz[klabels[d][ind]] += d;
@@ -894,20 +920,25 @@ void LKM::PerformLKMVoxelClustering(
 				}
 			}
 		}
-
+/*
 		{for( int k = 0; k < numk; k++ )
 		{
 			if( clustersize[k] <= 0 ) clustersize[k] = 1;
 			inv[k] = 1.0/clustersize[k];//computing inverse now to multiply, than divide later
-		}}
+		}}*/
 		
-		{for( int k = 0; k < numk; k++ )
+		//#pragma omp parallel for
+		for( int k = 0; k < numk; k++ )
 		{
-			kseedsl[k] = sigmal[k]*inv[k];
-			kseedsx[k] = sigmax[k]*inv[k];
-			kseedsy[k] = sigmay[k]*inv[k];
-			kseedsz[k] = sigmaz[k]*inv[k];
-		}}
+			FloatType cSize = clustersize[k];
+			if( cSize <= 0 ) cSize = 1;
+			FloatType invK = 1.0 / cSize;
+			
+			kseedsl[k] = sigmal[k]*invK;
+			kseedsx[k] = sigmax[k]*invK;
+			kseedsy[k] = sigmay[k]*invK;
+			kseedsz[k] = sigmaz[k]*invK;
+		}
 	}
 }
 
@@ -1179,11 +1210,11 @@ void LKM::DoSuperpixelSegmentation(
 	const int&					STEP,
         const float M)
 {
-	vector<double> kseedsl(0);
-	vector<double> kseedsa(0);
-	vector<double> kseedsb(0);
-	vector<double> kseedsx(0);
-	vector<double> kseedsy(0);
+	vector<FloatType> kseedsl(0);
+	vector<FloatType> kseedsa(0);
+	vector<FloatType> kseedsb(0);
+	vector<FloatType> kseedsx(0);
+	vector<FloatType> kseedsy(0);
 
 	//--------------------------------------------------
 	m_width  = width;
@@ -1218,6 +1249,7 @@ void LKM::DoSuperpixelSegmentation(
 }
 
 
+#if 0
 //===========================================================================
 ///	DoSegmentation_LABXY
 ///
@@ -1232,14 +1264,14 @@ void LKM::DoSupervoxelSegmentation(
 	sidType**&	       				klabels,
 	int&						numlabels,
 	const int&					STEP,
-        const double cubeness)
+        const FloatType cubeness)
 {
-	vector<double> kseedsl(0);
-	vector<double> kseedsa(0);
-	vector<double> kseedsb(0);
-	vector<double> kseedsx(0);
-	vector<double> kseedsy(0);
-	vector<double> kseedsz(0);
+	vector<FloatType> kseedsl(0);
+	vector<FloatType> kseedsa(0);
+	vector<FloatType> kseedsb(0);
+	vector<FloatType> kseedsx(0);
+	vector<FloatType> kseedsy(0);
+	vector<FloatType> kseedsz(0);
 
 	//--------------------------------------------------
 	m_width  = width;
@@ -1249,15 +1281,15 @@ void LKM::DoSupervoxelSegmentation(
 	
 	//--------------------------------------------------
 	klabels = new sidType*[depth];
-	m_lvecvec = new double*[depth];
-	m_avecvec = new double*[depth];
-	m_bvecvec = new double*[depth];
+	m_lvecvec = new FloatType*[depth];
+	m_avecvec = new FloatType*[depth];
+	m_bvecvec = new FloatType*[depth];
 	for( int d = 0; d < depth; d++ )
 	{
 		klabels[d] = new sidType[sz];
-		m_lvecvec[d] = new double[sz];
-		m_avecvec[d] = new double[sz];
-		m_bvecvec[d] = new double[sz];
+		m_lvecvec[d] = new FloatType[sz];
+		m_avecvec[d] = new FloatType[sz];
+		m_bvecvec[d] = new FloatType[sz];
 		for( int s = 0; s < sz; s++ )
 		{
                   klabels[d][s] = UNDEFINED_LABEL;
@@ -1290,31 +1322,37 @@ void LKM::DoSupervoxelSegmentation(
 	//SaveLabels(klabels, width, height, filename, savepath);
 }
 
+#endif
 
 void LKM::DoSupervoxelSegmentationForGrayVolume(
-                                                double**					ubuffvec,
-                                                const int					width,
-                                                const int					height,
-                                                const int					depth,
+                                                const unsigned char*                            ubuffvec,
+                                                const int&					width,
+                                                const int&					height,
+                                                const int&					depth,
                                                 sidType**&					klabels,
                                                 int&						numlabels,
-                                                const int					STEP,
-                                                const double cubeness)
+                                                const int&					STEP,
+                                                const FloatType cubeness,
+                                                int zStep    // if zStep <= 0, then zStep = STEP
+                                               )
 {
-	vector<double> kseedsl(0);
-	vector<double> kseedsx(0);
-	vector<double> kseedsy(0);
-	vector<double> kseedsz(0);
+        vector<FloatType> kseedsl(0);
+        vector<FloatType> kseedsx(0);
+        vector<FloatType> kseedsy(0);
+        vector<FloatType> kseedsz(0);
+        
+        if (zStep <= 0)
+            zStep = STEP;
 
 	//--------------------------------------------------
 	m_width  = width;
 	m_height = height;
 	m_depth  = depth;
-	unsigned long sz = m_width*m_height;
+	int sz = m_width*m_height;
 	
 	//--------------------------------------------------
-        unsigned long memSize = sizeof(int)*depth + depth*sz*sizeof(sidType);
-        printf("[LKM] memory required to run supervoxel algorithm = %ldMb\n", memSize/(1024*1024));
+        unsigned int memSize = sizeof(int)*depth + depth*sz*sizeof(sidType);
+        printf("[LKM] memory required to run supervoxel algorithm = %dMb\n", memSize/(1024*1024));
 	klabels = new sidType*[depth];
         m_lvecvec = ubuffvec;
 	for( int d = 0; d < depth; d++ )
@@ -1330,7 +1368,7 @@ void LKM::DoSupervoxelSegmentationForGrayVolume(
 	//DoRGBtoLABConversion(ubuffvec, m_lvecvec, m_avecvec, m_bvecvec);
 	//--------------------------------------------------
 
-	GetKValues_LABXYZ(kseedsl, kseedsx, kseedsy, kseedsz, STEP);
+	GetKValues_LABXYZ(kseedsl, kseedsx, kseedsy, kseedsz, STEP, zStep);
 
 	PerformLKMVoxelClustering(kseedsl, kseedsx, kseedsy, kseedsz, klabels, STEP, cubeness);
 	numlabels = kseedsl.size();
@@ -1391,13 +1429,7 @@ void LKM::RelabelSupervoxels(
                           if(nlabels[d][i] == UNDEFINED_LABEL)
 				{
 					nlabels[d][i] = lab;
-					//FindNext(labels, nlabels, depth, height, width, d, h, w, lab);
-                                        //Al
-                                        std::stack<sPixel> listPixels;
-                                        sPixel pix;
-                                        pix.x = w; pix.y = h; pix.z = d;
-                                        listPixels.push(pix);
-					FindNext(labels, nlabels, depth, height, width, listPixels, lab);
+					FindNext(labels, nlabels, depth, height, width, d, h, w, lab);
 					lab++;
 				}
 				i++;
@@ -1444,15 +1476,20 @@ void LKM::RelabelStraySupervoxels(
 	const int&					depth,
 	sidType**&		       			labels,
 	int&						numlabels,
-	const int&					STEP)
+	const int&					STEP,
+    int zStep
+                                 )
 {
+    if (zStep <= 0)
+        zStep = STEP;
+    
 	int sz = width*height;
-	const int SUPSZ = STEP*STEP*STEP;
+	const int SUPSZ = STEP*STEP*zStep;
 
 	int adjlabel(0);//adjacent label
-	int* xvec = new int[SUPSZ*4];//a large safe size
-	int* yvec = new int[SUPSZ*4];//a large safe size
-	int* zvec = new int[SUPSZ*4];//a large safe size
+        int* xvec = new int[SUPSZ*4*4];//a large safe size
+        int* yvec = new int[SUPSZ*4*4];//a large safe size
+        int* zvec = new int[SUPSZ*4*4];//a large safe size
 	//------------------
 	// memory allocation
 	//------------------
@@ -1473,8 +1510,8 @@ void LKM::RelabelStraySupervoxels(
 		{
 			for( int w = 0; w < width; w++ )
 			{
-                          //if(nlabels[d][i] < 0)
-                          if(nlabels[d][i] == UNDEFINED_LABEL)
+			  //if(nlabels[d][i] < 0)
+			  if(nlabels[d][i] == UNDEFINED_LABEL)
 				{
 					nlabels[d][i] = lab;
 					//-------------------------------------------------------
@@ -1510,13 +1547,7 @@ void LKM::RelabelStraySupervoxels(
 					xvec[0] = w; yvec[0] = h; zvec[0] = d;
 					int count(1);
 					//--------------------------------------------------------
-					//FindNext(labels, nlabels, depth, height, width, d, h, w, lab, xvec, yvec, zvec, count);
-                                        // Al
-                                        std::stack<sPixel> listPixels;
-                                        sPixel pix;
-                                        pix.x = w; pix.y = h; pix.z = d;
-                                        listPixels.push(pix);
-                                        FindNext(labels, nlabels, depth, height, width, listPixels, lab, xvec, yvec, zvec, count);
+					FindNext(labels, nlabels, depth, height, width, d, h, w, lab, xvec, yvec, zvec, count);
 					//-------------------------------------------------------
 					// If segment size is less then a limit, assign an
 					// adjacent label found before, and decrement label count.
@@ -1554,7 +1585,7 @@ void LKM::RelabelStraySupervoxels(
 
 	for( int d = 0; d < depth; d++ )
 	{
-		delete [] labels[d];
+                delete[] labels[d];
 	}
 	delete [] labels;
         labels = nlabels;
@@ -1563,6 +1594,9 @@ void LKM::RelabelStraySupervoxels(
 	if(xvec) delete [] xvec;
 	if(yvec) delete [] yvec;
 	if(zvec) delete [] zvec;
+
+        xvec = yvec = zvec = 0;
+
 	//------------------
 	numlabels = lab;
 	//------------------

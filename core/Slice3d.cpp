@@ -314,7 +314,7 @@ void Slice3d::generateSupervoxels(const double _cubeness)
       double** ptr_data;
       raw2Double(ptr_data);
       LKM* lkm = new LKM(false); // do not free memory
-      lkm->DoSupervoxelSegmentationForGrayVolume(ptr_data,
+      lkm->DoSupervoxelSegmentationForGrayVolume(raw_data,
                                                  (int)width,(int)height,(int)depth,
                                                  klabels,
                                                  nLabels,
