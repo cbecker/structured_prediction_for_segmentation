@@ -24,8 +24,6 @@ set(CMAKE_C_FLAGS         ${CMAKE_CXX_FLAGS})
 set(CMAKE_C_FLAGS_DEBUG   ${CMAKE_CXX_FLAGS_DEBUG})
 set(CMAKE_C_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
 
-set(OpenCV_DIR ~/src/third_party/opencv-2.4.9/)
-#set(OpenCV_DIR ~/src/ThirdParty/OpenCV-2.4.2/)
 FIND_PACKAGE(OpenCV REQUIRED)
 # add include directories
 INCLUDE_DIRECTORIES(${OPENCV_INCLUDE_DIR})
